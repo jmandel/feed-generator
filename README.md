@@ -149,3 +149,57 @@ To implement a topical feed, you might filter the algorithm for posts and pass t
 ## Community Feed Generator Templates
 
 - [Python](https://github.com/MarshalX/bluesky-feed-generator) - [@MarshalX](https://github.com/MarshalX)
+class RateLimiter {
+    private tokens: number;
+    private last: number;
+    private readonly capacity: number;
+    private readonly refillTime: number;
+
+    constructor(capacity: number, perSecond: number) {
+        this.tokens = capacity;
+        this.capacity = capacity;
+        this.refillTime = 1000 / perSecond;
+        this.last = Date.now();
+    }
+
+    async consume(): Promise<void> {
+        const now = Date.now();
+        const deltaTime = now - this.last;
+        this.last = now;
+
+        const tokensToAdd = Math.floor(deltaTime / this.refillTime);
+        this.tokens = Math.min(this.tokens + tokensToAdd, this.capacity);
+
+        if (this.tokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, this.refillTime));
+            return this.consume();
+        }
+
+        this.tokens -= 1;
+    }
+}
+
+const rateLimitedFetch = ({ maxSimultaneous, maxPerSecond }: { maxSimultaneous: number; maxPerSecond: number; }) => {
+    const limiter = new RateLimiter(maxSimultaneous, maxPerSecond);
+    const pendingFetches = new Set<Promise<any>>();
+
+    return async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+        while (pendingFetches.size >= maxSimultaneous) {
+            const firstResolved = await Promise.race(pendingFetches);
+            pendingFetches.delete(firstResolved);
+        }
+
+        await limiter.consume();
+
+        const fetchPromise = fetch(input, init);
+        pendingFetches.add(fetchPromise);
+
+        const response = await fetchPromise;
+        pendingFetches.delete(fetchPromise);
+
+        return response;
+    };
+};
+
+// Usage:
+const limitedFetch = rateLimitedFetch({maxSimultaneous: 5, maxPerSecond: 10});

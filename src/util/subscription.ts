@@ -12,11 +12,15 @@ import {
   isCommit,
 } from '../lexicon/types/com/atproto/sync/subscribeRepos'
 import { Database } from '../db'
+import { AppContext } from '../config'
+
+
 
 export abstract class FirehoseSubscriptionBase {
   public sub: Subscription<RepoEvent>
 
-  constructor(public db: Database, public service: string) {
+  
+  constructor(public db: Database, public service: string, public ctx: AppContext) {
     this.sub = new Subscription({
       service: service,
       method: ids.ComAtprotoSyncSubscribeRepos,

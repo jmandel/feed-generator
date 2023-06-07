@@ -1,10 +1,12 @@
+import { BskyAgent } from '@atproto/api'
 import { Database } from './db'
 import { DidResolver } from '@atproto/did-resolver'
 
 export type AppContext = {
   db: Database
   didResolver: DidResolver
-  cfg: Config
+  cfg: Config,
+  agent: BskyAgent
 }
 
 export type Config = {
