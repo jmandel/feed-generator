@@ -15,8 +15,29 @@ async function registerUser(agent: AppContext["agent"], db: AppContext["db"], ur
       .execute()
 }
 
+function base64UrlToBase64(base64Url: string): string {
+  return base64Url.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - base64Url.length % 4) % 4);
+}
+
+function decodeJwt(token: string): any {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('The token is invalid');
+  }
+
+  const payload = parts[1];
+  const base64 = base64UrlToBase64(payload);
+  const json = atob(base64);
+
+  return JSON.parse(json);
+}
+
 export default function (server: Server, ctx: AppContext) {
   server.app.bsky.feed.getFeedSkeleton(async ({ params, req }) => {
+
+    const token =  req.headers.authorization?.split(" ")[1]!;
+    const decoded = decodeJwt(token);
+    const userUri = decoded.iss as string;
 
     const feedUri = new AtUri(params.feed)
     const algo = algos[feedUri.rkey]
@@ -39,9 +60,9 @@ export default function (server: Server, ctx: AppContext) {
      *   ctx.didResolver,
      * )
      */
-    console.log("Feed for", feedUri)
-    registerUser(ctx.agent, ctx.db, feedUri.hostname)
-    const body = await algo(ctx, params, feedUri.hostname)
+    console.log("Feed for", userUri)
+    registerUser(ctx.agent, ctx.db, userUri)
+    const body = await algo(ctx, params, userUri)
     return {
       encoding: 'application/json',
       body: body,
